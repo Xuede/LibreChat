@@ -1,32 +1,10 @@
-# Base node image
-FROM node:19-alpine AS base
-WORKDIR /api
-COPY /api/package*.json /api/
-WORKDIR /client
-COPY /client/package*.json /client/
-WORKDIR /
-COPY /package*.json /
-RUN npm ci
-
-# React client build
-FROM base AS react-client
-WORKDIR /client
-COPY /client/ /client/
-ENV NODE_OPTIONS="--max-old-space-size=2048"
-RUN npm run build
-
-# Node API setup
-FROM base AS node-api
-WORKDIR /api
-COPY /api/ /api/
-COPY --from=react-client /client/dist /client/dist
+FROM node:lts-alpine
+ENV NODE_ENV=production
+WORKDIR /usr/src/app
+COPY ["package.json", "package-lock.json*", "npm-shrinkwrap.json*", "./"]
+RUN npm install --production --silent && mv node_modules ../
+COPY . .
 EXPOSE 3080
-ENV HOST=0.0.0.0
+RUN chown -R node /usr/src/app
+USER node
 CMD ["npm", "start"]
-
-# Optional: for client with nginx routing
-FROM nginx:stable-alpine AS nginx-client
-WORKDIR /usr/share/nginx/html
-COPY --from=react-client /client/dist /usr/share/nginx/html
-COPY client/nginx.conf /etc/nginx/conf.d/default.conf
-ENTRYPOINT ["nginx", "-g", "daemon off;"]
